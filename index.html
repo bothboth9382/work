@@ -12,6 +12,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- 引入 FontAwesome 圖示 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Firebase SDK (Compat 10.12.2) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -55,19 +58,26 @@
     <!-- 頂部導覽列 -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
-            <div class="flex items-center space-x-3 min-w-0">
-                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
-                    <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+            <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
+                    <i class="fa-solid fa-clock-rotate-left text-base sm:text-lg"></i>
                 </div>
                 <div class="min-w-0">
                     <div class="flex items-center space-x-2">
                         <h1 class="text-base sm:text-xl font-bold text-slate-900 tracking-tight truncate">智慧差勤系統</h1>
-                        <span id="headerActiveUserBadge" class="inline-flex items-center space-x-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                        <span id="headerActiveUserBadge" class="inline-flex items-center space-x-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full text-xs font-bold shrink-0">
                             <i class="fa-solid fa-user text-[10px]"></i>
                             <span id="headerActiveUserName">--</span>
                         </span>
                     </div>
-                    <p class="text-xs text-slate-500 hidden sm:block">團隊多人上下班打卡與假勤管理中心</p>
+                    <div class="flex items-center space-x-2 mt-0.5">
+                        <!-- 即時雲端同步狀態指示燈 -->
+                        <span id="cloudSyncBadge" class="inline-flex items-center space-x-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                            <span id="cloudSyncText">☁️ 雲端連線中...</span>
+                        </span>
+                        <span class="text-xs text-slate-400 hidden md:inline">· 多人即時同步差勤與假勤中心</span>
+                    </div>
                 </div>
             </div>
             
@@ -86,7 +96,7 @@
     </header>
 
     <!-- 主要內容區 -->
-    <main class="flex-grow max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6">
 
         <!-- 人員切換與快速管理列 -->
         <section class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 space-y-4">
@@ -99,7 +109,7 @@
                         <span>目前操作人員：</span>
                     </div>
                     <div class="relative flex-grow max-w-xs">
-                        <select id="activeEmployeeSelect" onchange="handleEmployeeChange()" class="w-full appearance-none bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-950 font-bold text-base rounded-xl pl-4 pr-10 py-2.5 border border-indigo-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition cursor-pointer">
+                        <select id="activeEmployeeSelect" onchange="handleEmployeeChange()" class="w-full appearance-none bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-950 font-bold text-base rounded-xl pl-4 pr-10 py-3 sm:py-2.5 border border-indigo-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition cursor-pointer">
                             <!-- 由 JS 動態生成人員選項 -->
                         </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-600">
@@ -109,30 +119,30 @@
                 </div>
 
                 <div class="flex items-center gap-2.5">
-                    <button type="button" onclick="toggleInlineAddEmployee(true)" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-blue-600/20 transition flex items-center justify-center space-x-1.5 cursor-pointer">
+                    <button type="button" onclick="toggleInlineAddEmployee(true)" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold px-4 py-3 sm:py-2.5 rounded-xl shadow-sm shadow-blue-600/20 transition flex items-center justify-center space-x-1.5 cursor-pointer">
                         <i class="fa-solid fa-user-plus"></i>
                         <span>+ 新增人員</span>
                     </button>
-                    <button type="button" onclick="openManageEmployeesModal()" class="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl border border-slate-200 transition flex items-center justify-center space-x-1.5 cursor-pointer">
+                    <button type="button" onclick="openManageEmployeesModal()" class="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-sm font-semibold px-4 py-3 sm:py-2.5 rounded-xl border border-slate-200 transition flex items-center justify-center space-x-1.5 cursor-pointer">
                         <i class="fa-solid fa-users-gear"></i>
                         <span>人員管理</span>
                     </button>
                 </div>
             </div>
 
-            <!-- 頁面內直接展開的快速新增人員輸入列 (免密碼，無彈窗遮擋問題) -->
+            <!-- 頁面內直接展開的快速新增人員輸入列 (免密碼) -->
             <div id="inlineAddEmployeeBar" class="hidden pt-3 border-t border-slate-100">
                 <form onsubmit="submitAddEmployee(event)" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 bg-blue-50/70 p-3.5 rounded-xl border border-blue-200">
                     <div class="flex items-center space-x-2 text-blue-800 font-bold text-xs sm:text-sm whitespace-nowrap px-1">
                         <i class="fa-solid fa-id-card-clip"></i>
                         <span>新人員姓名：</span>
                     </div>
-                    <input type="text" id="newEmployeeNameInput" maxlength="20" placeholder="請直接輸入姓名（例如：張雅婷），按 Enter 新增" class="flex-grow rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 focus:outline-none">
+                    <input type="text" id="newEmployeeNameInput" maxlength="20" placeholder="請直接輸入姓名（例如：張雅婷），按 Enter 新增" class="flex-grow rounded-xl border border-blue-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 focus:outline-none">
                     <div class="flex items-center gap-2 justify-end">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer whitespace-nowrap">
+                        <button type="submit" id="btnSubmitAddEmp" class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl shadow-sm transition cursor-pointer whitespace-nowrap">
                             <i class="fa-solid fa-check mr-1"></i>確認新增
                         </button>
-                        <button type="button" onclick="toggleInlineAddEmployee(false)" class="bg-white hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl border border-slate-200 transition cursor-pointer whitespace-nowrap">
+                        <button type="button" onclick="toggleInlineAddEmployee(false)" class="bg-white hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-200 transition cursor-pointer whitespace-nowrap">
                             取消
                         </button>
                     </div>
@@ -144,7 +154,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             <!-- 左側：即時時鐘與上下班打卡卡片 (佔 5 欄) -->
-            <section class="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between relative overflow-hidden">
+            <section class="lg:col-span-5 bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between relative overflow-hidden">
                 <!-- 裝飾背景圓圈 -->
                 <div class="absolute -right-10 -top-10 w-40 h-40 bg-blue-50 rounded-full opacity-60 pointer-events-none"></div>
                 
@@ -181,25 +191,25 @@
 
                     <!-- 今日出勤備註輸入框 -->
                     <div class="mt-3">
-                        <input type="text" id="todayNoteInput" onchange="updateTodayNote()" placeholder="選填：輸入今日出勤備註（如：外勤、居家辦公）" class="w-full rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition">
+                        <input type="text" id="todayNoteInput" onchange="updateTodayNote()" placeholder="選填：輸入今日出勤備註（如：外勤、居家辦公）" class="w-full rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition">
                     </div>
                 </div>
 
                 <!-- 當前打卡對象提示 -->
-                <div class="mt-4 mb-2.5 flex items-center justify-center space-x-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50/80 py-1.5 px-3 rounded-lg border border-indigo-100">
+                <div class="mt-4 mb-2.5 flex items-center justify-center space-x-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50/80 py-2 px-3 rounded-lg border border-indigo-100">
                     <i class="fa-solid fa-id-badge"></i>
                     <span>目前操作人員：<span id="clockPanelEmployeeName" class="underline font-bold">--</span></span>
                 </div>
 
-                <!-- 上下班打卡按鈕組 -->
+                <!-- 上下班打卡按鈕組 (加大觸控區域適合手機 NFC 感應後操作) -->
                 <div class="grid grid-cols-2 gap-3">
-                    <button type="button" id="btnClockIn" onclick="handleClock('in')" class="group relative flex flex-col items-center justify-center py-4 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer">
+                    <button type="button" id="btnClockIn" onclick="handleClock('in')" class="group relative flex flex-col items-center justify-center py-4 sm:py-5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer">
                         <i class="fa-solid fa-right-to-bracket text-xl mb-1 group-hover:translate-x-0.5 transition-transform"></i>
                         <span class="font-bold text-base">上班打卡</span>
                         <span class="text-[11px] text-blue-100 mt-0.5">記錄開始工作</span>
                     </button>
 
-                    <button type="button" id="btnClockOut" onclick="handleClock('out')" class="group relative flex flex-col items-center justify-center py-4 px-4 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer">
+                    <button type="button" id="btnClockOut" onclick="handleClock('out')" class="group relative flex flex-col items-center justify-center py-4 sm:py-5 px-4 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer">
                         <i class="fa-solid fa-right-from-bracket text-xl mb-1 group-hover:translate-x-0.5 transition-transform"></i>
                         <span class="font-bold text-base">下班打卡</span>
                         <span class="text-[11px] text-amber-100 mt-0.5">記錄結束工作</span>
@@ -208,7 +218,7 @@
             </section>
 
             <!-- 右側：本月出勤與請假統計摘要 (佔 7 欄) -->
-            <section class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+            <section class="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
                 <div>
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
                         <div>
@@ -218,7 +228,7 @@
                             </div>
                             <p id="statMonthLabel" class="text-xs text-slate-500 mt-0.5">統計區間：載入中...</p>
                         </div>
-                        <button type="button" onclick="openLeaveModal()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-indigo-600/20 transition flex items-center space-x-2 cursor-pointer">
+                        <button type="button" onclick="openLeaveModal()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold px-4 py-3 sm:py-2.5 rounded-xl shadow-sm shadow-indigo-600/20 transition flex items-center space-x-2 cursor-pointer">
                             <i class="fa-solid fa-calendar-plus"></i>
                             <span>我要請假</span>
                         </button>
@@ -277,7 +287,7 @@
             <div class="p-5 sm:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">差勤與請假紀錄明細</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">檢視、篩選或管理所有人員的歷史打卡與請假申請</p>
+                    <p class="text-xs text-slate-500 mt-0.5">雲端即時同步所有人員的歷史打卡與請假申請</p>
                 </div>
 
                 <!-- 篩選按鈕群組 -->
@@ -345,10 +355,9 @@
     <!-- 頁尾 -->
     <footer class="bg-white border-t border-slate-200 py-4 mt-8">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
-            <p>© 2026 智慧差勤與請假管理系統 · 人員名單與紀錄自動儲存於您的瀏覽器本機空間</p>
+            <p>© 2026 智慧差勤與請假管理系統 · Firebase Firestore 雲端即時同步版</p>
             <div class="flex items-center space-x-4">
                 <button type="button" onclick="seedDemoData()" class="hover:text-blue-600 transition underline cursor-pointer">載入範例測試資料</button>
-                <button type="button" onclick="openConfirmClearModal()" class="hover:text-rose-600 transition underline cursor-pointer">清除所有紀錄</button>
             </div>
         </div>
     </footer>
@@ -357,8 +366,8 @@
     <!-- 彈窗 1：請假申請表單 Modal                    -->
     <!-- ========================================== -->
     <div id="leaveModal" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
-            <div class="px-6 py-4 bg-indigo-600 text-white flex items-center justify-between">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="px-6 py-4 bg-indigo-600 text-white flex items-center justify-between shrink-0">
                 <div class="flex items-center space-x-2">
                     <i class="fa-solid fa-file-signature"></i>
                     <h3 class="text-lg font-bold">新增請假申請</h3>
@@ -368,7 +377,7 @@
                 </button>
             </div>
 
-            <form id="leaveForm" onsubmit="submitLeaveForm(event)" class="p-6 space-y-4">
+            <form id="leaveForm" onsubmit="submitLeaveForm(event)" class="p-6 space-y-4 overflow-y-auto">
                 <!-- 申請人顯示 -->
                 <div class="bg-indigo-50/80 border border-indigo-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
                     <span class="text-xs font-semibold text-indigo-700">請假申請人員</span>
@@ -437,7 +446,7 @@
                 <!-- 表單按鈕 -->
                 <div class="pt-2 flex items-center justify-end space-x-3 border-t border-slate-100">
                     <button type="button" onclick="closeLeaveModal()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">取消</button>
-                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition flex items-center space-x-1.5 cursor-pointer">
+                    <button type="submit" id="btnSubmitLeave" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition flex items-center space-x-1.5 cursor-pointer">
                         <i class="fa-solid fa-check"></i>
                         <span>送出請假單</span>
                     </button>
@@ -489,7 +498,7 @@
                 </div>
             </div>
 
-            <!-- 刪除密碼驗證區 (點選刪除某人員時展開) -->
+            <!-- 刪除密碼驗證區 (點選刪除某人員時展開，無任何密碼提示) -->
             <div id="deletePasswordSection" class="hidden px-6 py-4 bg-rose-50 border-t border-rose-200 space-y-3">
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-rose-800">
@@ -517,24 +526,40 @@
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
     <!-- ========================================== -->
-    <!-- JavaScript 核心邏輯                        -->
+    <!-- JavaScript 核心邏輯 (整合 Firebase Firestore) -->
     <!-- ========================================== -->
     <script>
-        // 儲存鍵值定義
-        const STORAGE_KEY_ATTENDANCE = 'smart_attendance_records_v2';
-        const STORAGE_KEY_LEAVES = 'smart_leave_records_v2';
-        const STORAGE_KEY_EMPLOYEES = 'smart_attendance_employees_v2';
+        // 內建硬編碼 Firebase Firestore 設定（NFC 感應與 GitHub Pages 開箱即用）
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCJGTxxVeeR8NSm4uR59foDd6tXMBi1Kj4",
+            authDomain: "company-attendance-2875a.firebaseapp.com",
+            projectId: "company-attendance-2875a",
+            storageBucket: "company-attendance-2875a.firebasestorage.app",
+            messagingSenderId: "293672240475",
+            appId: "1:293672240475:web:1050a7ddbadfc40c48867e"
+        };
+
+        // Firestore 集合名稱與本機偏好設定鍵值
+        const COL_RECORDS = 'attendance_records';
+        const COL_EMPLOYEES = 'attendance_employees';
         const STORAGE_KEY_ACTIVE_EMP = 'smart_attendance_active_emp_v2';
         const ADMIN_DELETE_PASSWORD = '1688';
         const DEFAULT_EMPLOYEES = ['王小明', '陳美玲', '林志豪'];
 
-        // 應用程式狀態
-        let employees = [];            // 人員名單陣列
-        let activeEmployee = '';       // 目前選中的操作人員
-        let attendanceRecords = [];    // 打卡紀錄陣列
-        let leaveRecords = [];         // 請假紀錄陣列
+        // Firebase 實例與監聽器
+        let db = null;
+        let unsubscribeEmployees = null;
+        let unsubscribeRecords = null;
+
+        // 應用程式即時狀態
+        let employeeDocs = [];         // [{ id, name, createdAt }]
+        let employees = [];            // ['王小明', '陳美玲', ...]
+        let activeEmployee = '';       // 本機裝置記住的操作人員
+        let attendanceRecords = [];    // 打卡紀錄陣列 (從 Firestore 即時同步)
+        let leaveRecords = [];         // 請假紀錄陣列 (從 Firestore 即時同步)
         let currentTypeFilter = 'all'; // 'all' | 'attendance' | 'leave'
         let pendingDeleteEmployee = null;
+        let isSeedingDefaultEmployees = false;
 
         // 假別顏色與標籤樣式對應表
         const LEAVE_BADGE_STYLES = {
@@ -552,54 +577,171 @@
 
         // 初始化應用程式
         document.addEventListener('DOMContentLoaded', () => {
-            loadFromStorage();
+            // 先載入本機上次記住的人員與預設名單，避免畫面空白
+            employees = [...DEFAULT_EMPLOYEES];
+            const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE_EMP);
+            activeEmployee = savedActive || employees[0];
+
             initMonthFilter();
             renderEmployeeDropdowns();
             startLiveClock();
             refreshUI();
+
+            // 啟動 Firebase 自動連線與即時同步監聽
+            initFirebaseCloudSync();
         });
+
+        // 更新頂部雲端同步狀態指示燈
+        function setCloudSyncStatus(status, customMsg) {
+            const badge = document.getElementById('cloudSyncBadge');
+            const dot = document.getElementById('cloudSyncDot');
+            const text = document.getElementById('cloudSyncText');
+
+            if (status === 'connected') {
+                badge.className = 'inline-flex items-center space-x-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+                text.textContent = customMsg || '☁️ 雲端已即時同步';
+            } else if (status === 'connecting') {
+                badge.className = 'inline-flex items-center space-x-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
+                dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+                text.textContent = customMsg || '☁️ 雲端連線中...';
+            } else {
+                badge.className = 'inline-flex items-center space-x-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200';
+                dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+                text.textContent = customMsg || '☁️ 雲端連線異常';
+            }
+        }
+
+        // 初始化 Firebase SDK 並建立 Firestore onSnapshot 即時監聽
+        function initFirebaseCloudSync() {
+            try {
+                setCloudSyncStatus('connecting');
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG);
+                }
+                db = firebase.firestore();
+
+                // 1. 監聽人員集合 (attendance_employees)
+                unsubscribeEmployees = db.collection(COL_EMPLOYEES).onSnapshot(async (snapshot) => {
+                    if (snapshot.empty && !isSeedingDefaultEmployees) {
+                        // 若 Firestore 尚無人員資料，自動寫入預設名單
+                        isSeedingDefaultEmployees = true;
+                        try {
+                            const batch = db.batch();
+                            DEFAULT_EMPLOYEES.forEach((name, idx) => {
+                                const docRef = db.collection(COL_EMPLOYEES).doc();
+                                batch.set(docRef, {
+                                    name: name,
+                                    order: idx,
+                                    createdAt: new Date().toISOString()
+                                });
+                            });
+                            await batch.commit();
+                        } catch (seedErr) {
+                            console.error('初始化預設人員失敗:', seedErr);
+                        } finally {
+                            isSeedingDefaultEmployees = false;
+                        }
+                        return;
+                    }
+
+                    const docs = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data && data.name) {
+                            docs.push({
+                                id: doc.id,
+                                name: data.name,
+                                order: typeof data.order === 'number' ? data.order : 999,
+                                createdAt: data.createdAt || ''
+                            });
+                        }
+                    });
+
+                    // 依建立順序或時間排序
+                    docs.sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
+
+                    if (docs.length > 0) {
+                        employeeDocs = docs;
+                        employees = docs.map(d => d.name);
+
+                        // 維持本機記住的操作人員；若已不存在則切換為第一位
+                        const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE_EMP);
+                        if (savedActive && employees.includes(savedActive)) {
+                            activeEmployee = savedActive;
+                        } else if (!employees.includes(activeEmployee)) {
+                            activeEmployee = employees[0];
+                            localStorage.setItem(STORAGE_KEY_ACTIVE_EMP, activeEmployee);
+                        }
+
+                        renderEmployeeDropdowns();
+                        if (!document.getElementById('manageEmployeesModal').classList.contains('hidden')) {
+                            renderEmployeeManageList();
+                        }
+                        refreshUI();
+                    }
+                    setCloudSyncStatus('connected');
+                }, (error) => {
+                    console.error('Firestore 人員同步錯誤:', error);
+                    setCloudSyncStatus('error', '☁️ 權限或連線異常');
+                    showToast('雲端人員同步失敗，請確認 Firestore 規則已發布', 'error');
+                });
+
+                // 2. 監聽差勤與請假紀錄集合 (attendance_records)
+                unsubscribeRecords = db.collection(COL_RECORDS).onSnapshot((snapshot) => {
+                    const nextAtt = [];
+                    const nextLeaves = [];
+
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (!data) return;
+                        if (data.recordType === 'leave') {
+                            nextLeaves.push({
+                                id: doc.id,
+                                employee: data.employee || '未指定',
+                                date: data.date || '',
+                                type: data.type || '其他假別',
+                                startTime: data.startTime || '09:00',
+                                endTime: data.endTime || '18:00',
+                                hours: Number(data.hours) || 0,
+                                reason: data.reason || ''
+                            });
+                        } else {
+                            nextAtt.push({
+                                id: doc.id,
+                                employee: data.employee || '未指定',
+                                date: data.date || '',
+                                clockIn: data.clockIn || null,
+                                clockOut: data.clockOut || null,
+                                workHours: Number(data.workHours) || 0,
+                                note: data.note || '正常出勤'
+                            });
+                        }
+                    });
+
+                    attendanceRecords = nextAtt;
+                    leaveRecords = nextLeaves;
+
+                    renderEmployeeDropdowns();
+                    refreshUI();
+                    setCloudSyncStatus('connected');
+                }, (error) => {
+                    console.error('Firestore 紀錄同步錯誤:', error);
+                    setCloudSyncStatus('error', '☁️ 紀錄同步異常');
+                    showToast('雲端差勤資料讀取失敗，請檢查網路或 Firestore 規則', 'error');
+                });
+
+            } catch (err) {
+                console.error('Firebase 初始化失敗:', err);
+                setCloudSyncStatus('error', '☁️ 初始化失敗');
+            }
+        }
 
         // 統一刷新全畫面狀態
         function refreshUI() {
             updateTodayStatusCard();
             updateStatistics();
             renderRecords();
-        }
-
-        // 1. 讀取與儲存 localStorage
-        function loadFromStorage() {
-            try {
-                const savedEmps = localStorage.getItem(STORAGE_KEY_EMPLOYEES);
-                employees = savedEmps ? JSON.parse(savedEmps) : [...DEFAULT_EMPLOYEES];
-                if (!Array.isArray(employees) || employees.length === 0) {
-                    employees = [...DEFAULT_EMPLOYEES];
-                }
-
-                const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE_EMP);
-                activeEmployee = (savedActive && employees.includes(savedActive)) ? savedActive : employees[0];
-
-                const savedAtt = localStorage.getItem(STORAGE_KEY_ATTENDANCE);
-                const savedLeaves = localStorage.getItem(STORAGE_KEY_LEAVES);
-                attendanceRecords = savedAtt ? JSON.parse(savedAtt) : [];
-                leaveRecords = savedLeaves ? JSON.parse(savedLeaves) : [];
-            } catch (e) {
-                console.error('讀取本機資料失敗:', e);
-                employees = [...DEFAULT_EMPLOYEES];
-                activeEmployee = employees[0];
-                attendanceRecords = [];
-                leaveRecords = [];
-            }
-        }
-
-        function saveToStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
-                localStorage.setItem(STORAGE_KEY_ACTIVE_EMP, activeEmployee);
-                localStorage.setItem(STORAGE_KEY_ATTENDANCE, JSON.stringify(attendanceRecords));
-                localStorage.setItem(STORAGE_KEY_LEAVES, JSON.stringify(leaveRecords));
-            } catch (e) {
-                showToast('儲存資料失敗，請檢查瀏覽器空間', 'error');
-            }
         }
 
         // 渲染人員下拉選單（上方操作人員 + 頂部徽章 + 下方篩選選單）
@@ -633,13 +775,13 @@
             }
         }
 
-        // 切換目前操作人員
+        // 切換目前操作人員 (僅記憶於本機手機瀏覽器，不影響其他同事手機)
         function handleEmployeeChange() {
             const select = document.getElementById('activeEmployeeSelect');
             activeEmployee = select.value;
+            localStorage.setItem(STORAGE_KEY_ACTIVE_EMP, activeEmployee);
             document.getElementById('clockPanelEmployeeName').textContent = activeEmployee;
             document.getElementById('headerActiveUserName').textContent = activeEmployee;
-            saveToStorage();
             updateTodayStatusCard();
             showToast(`已切換操作人員為「${activeEmployee}」`, 'info');
         }
@@ -658,10 +800,11 @@
             }
         }
 
-        // 提交新增人員表單 (免密碼)
-        function submitAddEmployee(event) {
+        // 提交新增人員表單 (免密碼，寫入 Firestore 並同步切換本機操作人員)
+        async function submitAddEmployee(event) {
             event.preventDefault();
             const input = document.getElementById('newEmployeeNameInput');
+            const submitBtn = document.getElementById('btnSubmitAddEmp');
             const name = input.value.trim();
 
             if (!name) {
@@ -674,14 +817,30 @@
                 input.focus();
                 return;
             }
+            if (!db) {
+                showToast('雲端資料庫尚未連線完成，請稍候再試！', 'error');
+                return;
+            }
 
-            employees.push(name);
-            activeEmployee = name;
-            saveToStorage();
-            renderEmployeeDropdowns();
-            refreshUI();
-            toggleInlineAddEmployee(false);
-            showToast(`已新增並切換至人員「${name}」`, 'success');
+            submitBtn.disabled = true;
+            try {
+                activeEmployee = name;
+                localStorage.setItem(STORAGE_KEY_ACTIVE_EMP, name);
+
+                await db.collection(COL_EMPLOYEES).add({
+                    name: name,
+                    order: employees.length,
+                    createdAt: new Date().toISOString()
+                });
+
+                toggleInlineAddEmployee(false);
+                showToast(`已新增並切換至人員「${name}」`, 'success');
+            } catch (err) {
+                console.error('新增人員至 Firestore 失敗:', err);
+                showToast('新增人員失敗，請檢查網路連線', 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
         }
 
         // 人員管理與刪除驗證 Modal 控制
@@ -746,7 +905,7 @@
             confirmDeleteEmployeeWithPassword();
         }
 
-        function confirmDeleteEmployeeWithPassword() {
+        async function confirmDeleteEmployeeWithPassword() {
             const pwdInput = document.getElementById('deleteEmployeePasswordInput');
             const pwd = pwdInput.value.trim();
 
@@ -757,21 +916,28 @@
                 return;
             }
 
-            if (!pendingDeleteEmployee) return;
+            if (!pendingDeleteEmployee || !db) return;
 
             const deletedName = pendingDeleteEmployee;
-            employees = employees.filter(e => e !== deletedName);
+            try {
+                // 找出 Firestore 中對應名稱的人員文件並刪除
+                const snap = await db.collection(COL_EMPLOYEES).where('name', '==', deletedName).get();
+                const batch = db.batch();
+                snap.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
 
-            if (activeEmployee === deletedName) {
-                activeEmployee = employees[0];
+                if (activeEmployee === deletedName) {
+                    const remaining = employees.filter(e => e !== deletedName);
+                    activeEmployee = remaining[0] || DEFAULT_EMPLOYEES[0];
+                    localStorage.setItem(STORAGE_KEY_ACTIVE_EMP, activeEmployee);
+                }
+
+                cancelDeleteEmployee();
+                showToast(`已成功刪除人員「${deletedName}」`, 'success');
+            } catch (err) {
+                console.error('刪除人員失敗:', err);
+                showToast('刪除人員失敗，請檢查網路連線', 'error');
             }
-
-            saveToStorage();
-            cancelDeleteEmployee();
-            renderEmployeeManageList();
-            renderEmployeeDropdowns();
-            refreshUI();
-            showToast(`已成功刪除人員「${deletedName}」`, 'success');
         }
 
         // 2. 初始化月份篩選器為當月
@@ -821,68 +987,94 @@
             setInterval(updateClock, 1000);
         }
 
-        // 4. 上下班打卡處理邏輯 (綁定目前操作人員)
-        function handleClock(type) {
+        // 4. 上下班打卡處理邏輯 (直接寫入 Firestore 並即時同步)
+        async function handleClock(type) {
             if (!activeEmployee) {
                 showToast('請先選擇操作人員！', 'error');
                 return;
             }
+            if (!db) {
+                showToast('雲端資料庫尚未連線完成，請稍候再試！', 'error');
+                return;
+            }
 
-            const today = getTodayDateString();
-            const nowTime = getCurrentTimeString();
-            const customNote = document.getElementById('todayNoteInput').value.trim();
-            let todayRecord = attendanceRecords.find(r => r.date === today && r.employee === activeEmployee);
+            const btnIn = document.getElementById('btnClockIn');
+            const btnOut = document.getElementById('btnClockOut');
+            btnIn.disabled = true;
+            btnOut.disabled = true;
 
-            if (type === 'in') {
-                if (todayRecord && todayRecord.clockIn) {
-                    showToast(`${activeEmployee} 今日已於 ${todayRecord.clockIn} 打過上班卡囉！`, 'warning');
-                    return;
-                }
-                if (!todayRecord) {
-                    todayRecord = {
-                        id: 'att_' + Date.now(),
-                        employee: activeEmployee,
-                        date: today,
-                        clockIn: nowTime,
-                        clockOut: null,
-                        workHours: 0,
-                        note: customNote || '正常出勤'
-                    };
-                    attendanceRecords.push(todayRecord);
-                } else {
-                    todayRecord.clockIn = nowTime;
-                    if (customNote) todayRecord.note = customNote;
-                }
-                saveToStorage();
-                renderEmployeeDropdowns();
-                refreshUI();
-                showToast(`${activeEmployee} 上班打卡成功！時間：${nowTime}`, 'success');
+            try {
+                const today = getTodayDateString();
+                const nowTime = getCurrentTimeString();
+                const customNote = document.getElementById('todayNoteInput').value.trim();
+                const todayRecord = attendanceRecords.find(r => r.date === today && r.employee === activeEmployee);
 
-            } else if (type === 'out') {
-                if (!todayRecord || !todayRecord.clockIn) {
-                    showToast(`請先為「${activeEmployee}」進行上班打卡，再打下班卡！`, 'error');
-                    return;
+                if (type === 'in') {
+                    if (todayRecord && todayRecord.clockIn) {
+                        showToast(`${activeEmployee} 今日已於 ${todayRecord.clockIn} 打過上班卡囉！`, 'warning');
+                        return;
+                    }
+
+                    if (!todayRecord) {
+                        await db.collection(COL_RECORDS).add({
+                            recordType: 'attendance',
+                            employee: activeEmployee,
+                            date: today,
+                            clockIn: nowTime,
+                            clockOut: null,
+                            workHours: 0,
+                            note: customNote || '正常出勤',
+                            updatedAt: new Date().toISOString()
+                        });
+                    } else {
+                        await db.collection(COL_RECORDS).doc(todayRecord.id).update({
+                            clockIn: nowTime,
+                            note: customNote || todayRecord.note || '正常出勤',
+                            updatedAt: new Date().toISOString()
+                        });
+                    }
+                    showToast(`${activeEmployee} 上班打卡成功！時間：${nowTime}`, 'success');
+
+                } else if (type === 'out') {
+                    if (!todayRecord || !todayRecord.clockIn) {
+                        showToast(`請先為「${activeEmployee}」進行上班打卡，再打下班卡！`, 'error');
+                        return;
+                    }
+                    const workHours = calculateWorkDuration(todayRecord.clockIn, nowTime);
+                    await db.collection(COL_RECORDS).doc(todayRecord.id).update({
+                        clockOut: nowTime,
+                        workHours: workHours,
+                        note: customNote || todayRecord.note || '正常出勤',
+                        updatedAt: new Date().toISOString()
+                    });
+                    showToast(`${activeEmployee} 下班打卡成功！今日工時：${workHours} 小時`, 'success');
                 }
-                todayRecord.clockOut = nowTime;
-                todayRecord.workHours = calculateWorkDuration(todayRecord.clockIn, nowTime);
-                if (customNote) todayRecord.note = customNote;
-                
-                saveToStorage();
-                refreshUI();
-                showToast(`${activeEmployee} 下班打卡成功！今日工時：${todayRecord.workHours} 小時`, 'success');
+            } catch (err) {
+                console.error('Firestore 打卡寫入失敗:', err);
+                showToast('打卡失敗，請檢查網路連線後重試！', 'error');
+            } finally {
+                btnIn.disabled = false;
+                btnOut.disabled = false;
             }
         }
 
-        // 更新今日出勤備註
-        function updateTodayNote() {
+        // 更新今日出勤備註 (同步更新 Firestore)
+        async function updateTodayNote() {
+            if (!db) return;
             const today = getTodayDateString();
             const todayRecord = attendanceRecords.find(r => r.date === today && r.employee === activeEmployee);
             const customNote = document.getElementById('todayNoteInput').value.trim();
             if (todayRecord) {
-                todayRecord.note = customNote || '正常出勤';
-                saveToStorage();
-                renderRecords();
-                showToast(`已更新「${activeEmployee}」今日出勤備註`, 'info');
+                try {
+                    await db.collection(COL_RECORDS).doc(todayRecord.id).update({
+                        note: customNote || '正常出勤',
+                        updatedAt: new Date().toISOString()
+                    });
+                    showToast(`已更新「${activeEmployee}」今日出勤備註`, 'info');
+                } catch (err) {
+                    console.error('更新備註失敗:', err);
+                    showToast('更新備註失敗，請檢查網路', 'error');
+                }
             }
         }
 
@@ -916,13 +1108,17 @@
             if (!todayRecord) {
                 elIn.textContent = '--:--:--';
                 elOut.textContent = '--:--:--';
-                noteInput.value = '';
+                if (document.activeElement !== noteInput) {
+                    noteInput.value = '';
+                }
                 badge.textContent = `${activeEmployee} · 今日尚未打卡`;
                 badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600';
             } else {
                 elIn.textContent = todayRecord.clockIn || '--:--:--';
                 elOut.textContent = todayRecord.clockOut || '--:--:--';
-                noteInput.value = (todayRecord.note && todayRecord.note !== '正常出勤') ? todayRecord.note : '';
+                if (document.activeElement !== noteInput) {
+                    noteInput.value = (todayRecord.note && todayRecord.note !== '正常出勤') ? todayRecord.note : '';
+                }
                 
                 if (todayRecord.clockIn && !todayRecord.clockOut) {
                     badge.textContent = `${activeEmployee} · 工作中`;
@@ -992,8 +1188,13 @@
             }
         }
 
-        function submitLeaveForm(event) {
+        async function submitLeaveForm(event) {
             event.preventDefault();
+            if (!db) {
+                showToast('雲端資料庫尚未連線完成，請稍候再試！', 'error');
+                return;
+            }
+
             const type = document.getElementById('leaveType').value;
             const date = document.getElementById('leaveDate').value;
             const startTime = document.getElementById('leaveStartTime').value;
@@ -1006,26 +1207,31 @@
                 return;
             }
 
-            const newLeave = {
-                id: 'lv_' + Date.now(),
-                employee: activeEmployee,
-                date,
-                type,
-                startTime,
-                endTime,
-                hours,
-                reason
-            };
+            const submitBtn = document.getElementById('btnSubmitLeave');
+            submitBtn.disabled = true;
 
-            leaveRecords.push(newLeave);
-            saveToStorage();
-            renderEmployeeDropdowns();
-            
-            document.getElementById('monthFilter').value = date.substring(0, 7);
-            
-            closeLeaveModal();
-            refreshUI();
-            showToast(`已為「${activeEmployee}」送出${type}申請 (${hours} 小時)`, 'success');
+            try {
+                await db.collection(COL_RECORDS).add({
+                    recordType: 'leave',
+                    employee: activeEmployee,
+                    date: date,
+                    type: type,
+                    startTime: startTime,
+                    endTime: endTime,
+                    hours: hours,
+                    reason: reason,
+                    createdAt: new Date().toISOString()
+                });
+
+                document.getElementById('monthFilter').value = date.substring(0, 7);
+                closeLeaveModal();
+                showToast(`已為「${activeEmployee}」送出${type}申請 (${hours} 小時)`, 'success');
+            } catch (err) {
+                console.error('送出請假單失敗:', err);
+                showToast('送出請假單失敗，請檢查網路連線！', 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
         }
 
         // 當下方人員篩選改變時，同步刷新統計摘要與明細表
@@ -1198,42 +1404,23 @@
             `).join('');
         }
 
-        // 8. 刪除紀錄與自訂確認框
+        // 8. 刪除雲端紀錄與自訂確認框
         function confirmDeleteRecord(category, id) {
             const modal = document.getElementById('confirmModal');
-            document.getElementById('confirmTitle').textContent = '確認刪除此筆紀錄？';
-            document.getElementById('confirmMessage').textContent = '刪除後將無法復原此筆差勤或請假資料，確定要繼續嗎？';
+            document.getElementById('confirmTitle').textContent = '確認刪除此筆雲端紀錄？';
+            document.getElementById('confirmMessage').textContent = '刪除後將同步自雲端資料庫移除且無法復原，確定要繼續嗎？';
             
             const actionBtn = document.getElementById('confirmActionBtn');
-            actionBtn.onclick = () => {
-                if (category === 'attendance') {
-                    attendanceRecords = attendanceRecords.filter(r => r.id !== id);
-                } else {
-                    leaveRecords = leaveRecords.filter(r => r.id !== id);
+            actionBtn.onclick = async () => {
+                if (!db) return;
+                try {
+                    await db.collection(COL_RECORDS).doc(id).delete();
+                    closeConfirmModal();
+                    showToast('已成功自雲端刪除紀錄', 'info');
+                } catch (err) {
+                    console.error('刪除紀錄失敗:', err);
+                    showToast('刪除失敗，請檢查網路連線', 'error');
                 }
-                saveToStorage();
-                refreshUI();
-                closeConfirmModal();
-                showToast('已成功刪除紀錄', 'info');
-            };
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function openConfirmClearModal() {
-            const modal = document.getElementById('confirmModal');
-            document.getElementById('confirmTitle').textContent = '清除所有本機資料？';
-            document.getElementById('confirmMessage').textContent = '這將會清空所有的打卡與請假歷史紀錄且無法復原！建議先匯出 CSV 備份。';
-            
-            const actionBtn = document.getElementById('confirmActionBtn');
-            actionBtn.onclick = () => {
-                attendanceRecords = [];
-                leaveRecords = [];
-                saveToStorage();
-                refreshUI();
-                closeConfirmModal();
-                showToast('已清空所有差勤與請假資料', 'info');
             };
 
             modal.classList.remove('hidden');
@@ -1313,30 +1500,38 @@
             showToast(`已成功下載「差勤與請假報表_${selectedMonth}_${fileSuffix}.csv」`, 'success');
         }
 
-        // 10. 載入範例測試資料 (含多位人員測試紀錄)
-        function seedDemoData() {
+        // 10. 載入範例測試資料至 Firestore (含多位人員測試紀錄)
+        async function seedDemoData() {
+            if (!db) {
+                showToast('雲端資料庫尚未連線完成！', 'error');
+                return;
+            }
             const selectedMonth = document.getElementById('monthFilter').value;
             const emp1 = employees[0] || '王小明';
             const emp2 = employees[1] || '陳美玲';
             const emp3 = employees[2] || '林志豪';
 
-            const demoAtt = [
-                { id: 'demo_a1_' + Date.now(), employee: emp1, date: `${selectedMonth}-02`, clockIn: '08:55:12', clockOut: '18:05:30', workHours: 8.17, note: '正常出勤' },
-                { id: 'demo_a2_' + Date.now(), employee: emp2, date: `${selectedMonth}-02`, clockIn: '09:00:05', clockOut: '18:10:00', workHours: 8.17, note: '正常出勤' },
-                { id: 'demo_a3_' + Date.now(), employee: emp3, date: `${selectedMonth}-03`, clockIn: '08:50:44', clockOut: '18:00:10', workHours: 8.16, note: '外勤拜訪客戶' },
-            ];
-            const demoLeaves = [
-                { id: 'demo_l1_' + Date.now(), employee: emp1, date: `${selectedMonth}-05`, type: '事假', startTime: '14:00', endTime: '18:00', hours: 4, reason: '下午前往銀行辦理個人房屋貸款手續' },
-                { id: 'demo_l2_' + Date.now(), employee: emp2, date: `${selectedMonth}-10`, type: '特休', startTime: '09:00', endTime: '18:00', hours: 8, reason: '安排家庭旅遊休假一日' },
-                { id: 'demo_l3_' + Date.now(), employee: emp3, date: `${selectedMonth}-12`, type: '病假', startTime: '09:00', endTime: '13:00', hours: 4, reason: '重感冒前往診所就醫與休息' }
+            const demoRecords = [
+                { recordType: 'attendance', employee: emp1, date: `${selectedMonth}-02`, clockIn: '08:55:12', clockOut: '18:05:30', workHours: 8.17, note: '正常出勤' },
+                { recordType: 'attendance', employee: emp2, date: `${selectedMonth}-02`, clockIn: '09:00:05', clockOut: '18:10:00', workHours: 8.17, note: '正常出勤' },
+                { recordType: 'attendance', employee: emp3, date: `${selectedMonth}-03`, clockIn: '08:50:44', clockOut: '18:00:10', workHours: 8.16, note: '外勤拜訪客戶' },
+                { recordType: 'leave', employee: emp1, date: `${selectedMonth}-05`, type: '事假', startTime: '14:00', endTime: '18:00', hours: 4, reason: '下午前往銀行辦理個人房屋貸款手續' },
+                { recordType: 'leave', employee: emp2, date: `${selectedMonth}-10`, type: '特休', startTime: '09:00', endTime: '18:00', hours: 8, reason: '安排家庭旅遊休假一日' },
+                { recordType: 'leave', employee: emp3, date: `${selectedMonth}-12`, type: '病假', startTime: '09:00', endTime: '13:00', hours: 4, reason: '重感冒前往診所就醫與休息' }
             ];
 
-            attendanceRecords = [...attendanceRecords, ...demoAtt];
-            leaveRecords = [...leaveRecords, ...demoLeaves];
-            saveToStorage();
-            renderEmployeeDropdowns();
-            refreshUI();
-            showToast('已載入本月多位人員範例出勤與請假資料！', 'success');
+            try {
+                const batch = db.batch();
+                demoRecords.forEach(item => {
+                    const ref = db.collection(COL_RECORDS).doc();
+                    batch.set(ref, { ...item, createdAt: new Date().toISOString() });
+                });
+                await batch.commit();
+                showToast('已寫入本月多位人員範例出勤與請假資料至雲端！', 'success');
+            } catch (err) {
+                console.error('載入範例資料失敗:', err);
+                showToast('載入範例資料失敗，請檢查 Firestore 權限規則', 'error');
+            }
         }
 
         // 工具函式：Toast 通知與 XSS 防護

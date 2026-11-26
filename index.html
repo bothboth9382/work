@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧差勤與請假管理系統</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts (Noto Sans TC & Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- 引入 FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 強制確保所有表單控制項具備完整點擊、選取與鍵盤輸入權限，不被任何外部樣式干擾 */
+        input, select, textarea {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            pointer-events: auto !important;
+        }
+        /* 確保隱藏的彈窗完全不攔截任何滑鼠或觸控事件 */
+        .modal-backdrop.hidden {
+            display: none !important;
+            pointer-events: none !important;
+        }
+        .modal-backdrop.flex {
+            display: flex !important;
+            pointer-events: auto !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- 頂部導覽列 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+            <div class="flex items-center space-x-3 min-w-0">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
+                    <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-base sm:text-xl font-bold text-slate-900 tracking-tight truncate">智慧差勤系統</h1>
+                        <span id="headerActiveUserBadge" class="inline-flex items-center space-x-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                            <i class="fa-solid fa-user text-[10px]"></i>
+                            <span id="headerActiveUserName">--</span>
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 hidden sm:block">團隊多人上下班打卡與假勤管理中心</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                <!-- 月份選擇器 (影響統計與列表) -->
+                <div class="relative">
+                    <input type="month" id="monthFilter" class="bg-slate-100 hover:bg-slate-200/70 text-slate-700 text-xs sm:text-sm font-medium rounded-xl px-2.5 sm:px-3 py-2 border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none transition cursor-pointer">
+                </div>
+                <!-- 匯出 CSV 按鈕 -->
+                <button type="button" onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs sm:text-sm font-medium px-3 sm:px-3.5 py-2 rounded-xl shadow-sm transition flex items-center space-x-1.5 cursor-pointer" title="匯出本月差勤與請假報表">
+                    <i class="fa-solid fa-file-csv"></i>
+                    <span class="hidden sm:inline">匯出報表</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="flex-grow max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+
+        <!-- 人員切換與快速管理列 -->
+        <section class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-grow">
+                    <div class="flex items-center space-x-2 text-slate-700 font-bold text-sm whitespace-nowrap">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                        <span>目前操作人員：</span>
+                    </div>
+                    <div class="relative flex-grow max-w-xs">
+                        <select id="activeEmployeeSelect" onchange="handleEmployeeChange()" class="w-full appearance-none bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-950 font-bold text-base rounded-xl pl-4 pr-10 py-2.5 border border-indigo-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition cursor-pointer">
+                            <!-- 由 JS 動態生成人員選項 -->
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-indigo-600">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2.5">
+                    <button type="button" onclick="toggleInlineAddEmployee(true)" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-blue-600/20 transition flex items-center justify-center space-x-1.5 cursor-pointer">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>+ 新增人員</span>
+                    </button>
+                    <button type="button" onclick="openManageEmployeesModal()" class="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl border border-slate-200 transition flex items-center justify-center space-x-1.5 cursor-pointer">
+                        <i class="fa-solid fa-users-gear"></i>
+                        <span>人員管理</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 頁面內直接展開的快速新增人員輸入列 (免密碼，無彈窗遮擋問題) -->
+            <div id="inlineAddEmployeeBar" class="hidden pt-3 border-t border-slate-100">
+                <form onsubmit="submitAddEmployee(event)" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 bg-blue-50/70 p-3.5 rounded-xl border border-blue-200">
+                    <div class="flex items-center space-x-2 text-blue-800 font-bold text-xs sm:text-sm whitespace-nowrap px-1">
+                        <i class="fa-solid fa-id-card-clip"></i>
+                        <span>新人員姓名：</span>
+                    </div>
+                    <input type="text" id="newEmployeeNameInput" maxlength="20" placeholder="請直接輸入姓名（例如：張雅婷），按 Enter 新增" class="flex-grow rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 focus:outline-none">
+                    <div class="flex items-center gap-2 justify-end">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer whitespace-nowrap">
+                            <i class="fa-solid fa-check mr-1"></i>確認新增
+                        </button>
+                        <button type="button" onclick="toggleInlineAddEmployee(false)" class="bg-white hover:bg-slate-100 text-slate-600 text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl border border-slate-200 transition cursor-pointer whitespace-nowrap">
+                            取消
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 上半部：即時打卡區 & 本月統計摘要 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- 左側：即時時鐘與上下班打卡卡片 (佔 5 欄) -->
+            <section class="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between relative overflow-hidden">
+                <!-- 裝飾背景圓圈 -->
+                <div class="absolute -right-10 -top-10 w-40 h-40 bg-blue-50 rounded-full opacity-60 pointer-events-none"></div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                            <span>即時系統時間</span>
+                        </span>
+                        <span id="currentStatusBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+                            今日尚未打卡
+                        </span>
+                    </div>
+
+                    <!-- 即時日期與大時鐘 -->
+                    <div class="my-2">
+                        <p id="liveDate" class="text-sm sm:text-base font-medium text-slate-500">載入日期中...</p>
+                        <div id="liveTime" class="text-4xl sm:text-5xl font-bold text-slate-900 tracking-tight mt-1 font-mono">
+                            00:00:00
+                        </div>
+                    </div>
+
+                    <!-- 今日打卡時間顯示 -->
+                    <div class="mt-4 grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <div>
+                            <p class="text-xs text-slate-400 mb-0.5">今日上班時間</p>
+                            <p id="todayClockIn" class="text-base font-bold text-slate-700 font-mono">--:--:--</p>
+                        </div>
+                        <div class="border-l border-slate-200 pl-3">
+                            <p class="text-xs text-slate-400 mb-0.5">今日下班時間</p>
+                            <p id="todayClockOut" class="text-base font-bold text-slate-700 font-mono">--:--:--</p>
+                        </div>
+                    </div>
+
+                    <!-- 今日出勤備註輸入框 -->
+                    <div class="mt-3">
+                        <input type="text" id="todayNoteInput" onchange="updateTodayNote()" placeholder="選填：輸入今日出勤備註（如：外勤、居家辦公）" class="w-full rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <!-- 當前打卡對象提示 -->
+                <div class="mt-4 mb-2.5 flex items-center justify-center space-x-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50/80 py-1.5 px-3 rounded-lg border border-indigo-100">
+                    <i class="fa-solid fa-id-badge"></i>
+                    <span>目前操作人員：<span id="clockPanelEmployeeName" class="underline font-bold">--</span></span>
+                </div>
+
+                <!-- 上下班打卡按鈕組 -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="btnClockIn" onclick="handleClock('in')" class="group relative flex flex-col items-center justify-center py-4 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer">
+                        <i class="fa-solid fa-right-to-bracket text-xl mb-1 group-hover:translate-x-0.5 transition-transform"></i>
+                        <span class="font-bold text-base">上班打卡</span>
+                        <span class="text-[11px] text-blue-100 mt-0.5">記錄開始工作</span>
+                    </button>
+
+                    <button type="button" id="btnClockOut" onclick="handleClock('out')" class="group relative flex flex-col items-center justify-center py-4 px-4 bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white rounded-xl shadow-md shadow-amber-500/20 transition-all cursor-pointer">
+                        <i class="fa-solid fa-right-from-bracket text-xl mb-1 group-hover:translate-x-0.5 transition-transform"></i>
+                        <span class="font-bold text-base">下班打卡</span>
+                        <span class="text-[11px] text-amber-100 mt-0.5">記錄結束工作</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 右側：本月出勤與請假統計摘要 (佔 7 欄) -->
+            <section class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                <div>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h2 class="text-lg font-bold text-slate-900">本月差勤統計摘要</h2>
+                                <span id="statEmployeeBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">全部人員</span>
+                            </div>
+                            <p id="statMonthLabel" class="text-xs text-slate-500 mt-0.5">統計區間：載入中...</p>
+                        </div>
+                        <button type="button" onclick="openLeaveModal()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-indigo-600/20 transition flex items-center space-x-2 cursor-pointer">
+                            <i class="fa-solid fa-calendar-plus"></i>
+                            <span>我要請假</span>
+                        </button>
+                    </div>
+
+                    <!-- 核心數據卡片 (出勤天數、總工時、總請假時數) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-blue-50/70 border border-blue-100 rounded-xl p-4">
+                            <div class="flex items-center justify-between text-blue-600 mb-2">
+                                <span class="text-xs font-semibold">實際出勤天數</span>
+                                <i class="fa-solid fa-calendar-check"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="statWorkDays" class="text-2xl sm:text-3xl font-bold text-slate-900">0</span>
+                                <span class="text-xs text-slate-500">天</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-4">
+                            <div class="flex items-center justify-between text-emerald-600 mb-2">
+                                <span class="text-xs font-semibold">累計工作時數</span>
+                                <i class="fa-solid fa-business-time"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="statTotalHours" class="text-2xl sm:text-3xl font-bold text-slate-900">0.0</span>
+                                <span class="text-xs text-slate-500">小時</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-purple-50/70 border border-purple-100 rounded-xl p-4">
+                            <div class="flex items-center justify-between text-purple-600 mb-2">
+                                <span class="text-xs font-semibold">請假總計時數</span>
+                                <i class="fa-solid fa-mug-hot"></i>
+                            </div>
+                            <div class="flex items-baseline space-x-1">
+                                <span id="statLeaveHours" class="text-2xl sm:text-3xl font-bold text-slate-900">0</span>
+                                <span class="text-xs text-slate-500">小時 (<span id="statLeaveDays">0</span>天)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 各假別明細分類統計 -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">本月各假別統計明細</h3>
+                    <div id="leaveBreakdownGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <!-- 由 JS 動態渲染各假別統計小卡 -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 下半部：打卡與請假紀錄列表 -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <!-- 列表標頭與篩選器 -->
+            <div class="p-5 sm:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">差勤與請假紀錄明細</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">檢視、篩選或管理所有人員的歷史打卡與請假申請</p>
+                </div>
+
+                <!-- 篩選按鈕群組 -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- 依人員篩選 (同步連動統計摘要) -->
+                    <select id="employeeRecordFilter" onchange="onRecordEmployeeFilterChange()" class="bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl px-3 py-2 border border-indigo-200 focus:border-indigo-500 focus:bg-white focus:outline-none cursor-pointer">
+                        <option value="all">全部人員</option>
+                    </select>
+
+                    <div class="inline-flex bg-slate-100 p-1 rounded-xl">
+                        <button type="button" onclick="setTypeFilter('all')" id="filter-all" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-white text-slate-900 shadow-sm cursor-pointer">全部紀錄</button>
+                        <button type="button" onclick="setTypeFilter('attendance')" id="filter-attendance" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-slate-900 cursor-pointer">上下班打卡</button>
+                        <button type="button" onclick="setTypeFilter('leave')" id="filter-leave" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition text-slate-600 hover:text-slate-900 cursor-pointer">請假紀錄</button>
+                    </div>
+
+                    <!-- 假別細項篩選 -->
+                    <select id="leaveTypeFilter" onchange="renderRecords()" class="bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none cursor-pointer">
+                        <option value="all">所有假別</option>
+                        <option value="事假">事假</option>
+                        <option value="病假">病假</option>
+                        <option value="特休">特休</option>
+                        <option value="公假">公假</option>
+                        <option value="婚假">婚假</option>
+                        <option value="喪假">喪假</option>
+                        <option value="產假/陪產假">產假/陪產假</option>
+                        <option value="生理假">生理假</option>
+                        <option value="補休">補休</option>
+                        <option value="其他假別">其他假別</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 紀錄表格 -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50/80 border-b border-slate-200/80 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            <th class="py-3.5 px-5">人員姓名</th>
+                            <th class="py-3.5 px-4">日期 / 星期</th>
+                            <th class="py-3.5 px-4">類型 / 假別</th>
+                            <th class="py-3.5 px-4">時間區間</th>
+                            <th class="py-3.5 px-4">時數計算</th>
+                            <th class="py-3.5 px-4">事由 / 備註</th>
+                            <th class="py-3.5 px-5 text-right">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-sm">
+                        <!-- 由 JS 動態生成紀錄列 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 空狀態提示 -->
+            <div id="emptyState" class="hidden py-14 px-4 text-center">
+                <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                    <i class="fa-regular fa-folder-open"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-700">尚無符合條件的紀錄</h3>
+                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">您可以點擊上方的「上班打卡」開始記錄今日出勤，或點擊「我要請假」新增請假申請。</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 頁尾 -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-8">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            <p>© 2026 智慧差勤與請假管理系統 · 人員名單與紀錄自動儲存於您的瀏覽器本機空間</p>
+            <div class="flex items-center space-x-4">
+                <button type="button" onclick="seedDemoData()" class="hover:text-blue-600 transition underline cursor-pointer">載入範例測試資料</button>
+                <button type="button" onclick="openConfirmClearModal()" class="hover:text-rose-600 transition underline cursor-pointer">清除所有紀錄</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- 彈窗 1：請假申請表單 Modal                    -->
+    <!-- ========================================== -->
+    <div id="leaveModal" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+            <div class="px-6 py-4 bg-indigo-600 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <h3 class="text-lg font-bold">新增請假申請</h3>
+                </div>
+                <button type="button" onclick="closeLeaveModal()" class="text-indigo-200 hover:text-white transition p-1 rounded-lg cursor-pointer">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="leaveForm" onsubmit="submitLeaveForm(event)" class="p-6 space-y-4">
+                <!-- 申請人顯示 -->
+                <div class="bg-indigo-50/80 border border-indigo-100 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                    <span class="text-xs font-semibold text-indigo-700">請假申請人員</span>
+                    <span id="leaveModalEmployeeName" class="text-sm font-bold text-indigo-950">--</span>
+                </div>
+
+                <!-- 假別選擇 -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">請假假別 <span class="text-rose-500">*</span></label>
+                    <select id="leaveType" required class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none bg-white">
+                        <option value="事假">事假 (因個人事務需親自處理)</option>
+                        <option value="病假">病假 (身體不適或就醫治療)</option>
+                        <option value="特休">特休 (年度特別休假)</option>
+                        <option value="公假">公假 (公務指派、教育訓練或兵役召集)</option>
+                        <option value="婚假">婚假 (結婚休假)</option>
+                        <option value="喪假">喪假 (親屬喪亡治喪)</option>
+                        <option value="產假/陪產假">產假 / 陪產假</option>
+                        <option value="生理假">生理假</option>
+                        <option value="補休">補休 (加班時數折抵休假)</option>
+                        <option value="其他假別">其他假別 (請於事由註明)</option>
+                    </select>
+                </div>
+
+                <!-- 請假日期與時數設定 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">請假日期 <span class="text-rose-500">*</span></label>
+                        <input type="date" id="leaveDate" required class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">快速設定時段</label>
+                        <select id="leavePreset" onchange="applyLeavePreset()" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none bg-slate-50">
+                            <option value="full">全天 (09:00 - 18:00，8小時)</option>
+                            <option value="am">上午半天 (09:00 - 13:00，4小時)</option>
+                            <option value="pm">下午半天 (14:00 - 18:00，4小時)</option>
+                            <option value="custom">自訂時間區間</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 開始時間與結束時間 -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">開始時間 <span class="text-rose-500">*</span></label>
+                        <input type="time" id="leaveStartTime" value="09:00" onchange="calculateLeaveHours()" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">結束時間 <span class="text-rose-500">*</span></label>
+                        <input type="time" id="leaveEndTime" value="18:00" onchange="calculateLeaveHours()" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">請假時數 <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <input type="number" id="leaveHours" step="0.5" min="0.5" max="24" value="8" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-indigo-700 bg-indigo-50/50 focus:border-indigo-500 focus:outline-none">
+                            <span class="absolute right-3 top-2 text-xs text-slate-400 pointer-events-none">hr</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 請假事由 -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">請假事由 / 職務代理人說明 <span class="text-rose-500">*</span></label>
+                    <textarea id="leaveReason" rows="3" required placeholder="請簡述請假原因，若有職務代理人亦可一併註明..." class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:outline-none resize-none"></textarea>
+                </div>
+
+                <!-- 表單按鈕 -->
+                <div class="pt-2 flex items-center justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onclick="closeLeaveModal()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">取消</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition flex items-center space-x-1.5 cursor-pointer">
+                        <i class="fa-solid fa-check"></i>
+                        <span>送出請假單</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 彈窗 2：一般刪除確認 Modal (取代 confirm)     -->
+    <!-- ========================================== -->
+    <div id="confirmModal" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
+            <div class="p-6 text-center space-y-3">
+                <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 id="confirmTitle" class="text-base font-bold text-slate-900">確認刪除？</h3>
+                <p id="confirmMessage" class="text-xs text-slate-500 leading-relaxed">刪除後將無法復原。</p>
+            </div>
+            <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-2">
+                <button type="button" onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200/70 transition cursor-pointer">取消</button>
+                <button type="button" id="confirmActionBtn" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition cursor-pointer">確認刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 彈窗 3：人員管理與刪除驗證 Modal             -->
+    <!-- ========================================== -->
+    <div id="manageEmployeesModal" class="modal-backdrop fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="px-6 py-4 bg-slate-800 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-users-gear"></i>
+                    <h3 class="text-base font-bold">人員清單管理</h3>
+                </div>
+                <button type="button" onclick="closeManageEmployeesModal()" class="text-slate-300 hover:text-white transition p-1 cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto space-y-3 flex-grow">
+                <p class="text-xs bg-amber-50 border border-amber-200/80 text-amber-800 px-3 py-2 rounded-xl">
+                    <i class="fa-solid fa-lock mr-1"></i> 刪除人員需輸入管理密碼驗證；刪除後該人員的歷史差勤紀錄仍會保留。
+                </p>
+                <div id="employeeManageList" class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                    <!-- 由 JS 動態渲染人員列表 -->
+                </div>
+            </div>
+
+            <!-- 刪除密碼驗證區 (點選刪除某人員時展開) -->
+            <div id="deletePasswordSection" class="hidden px-6 py-4 bg-rose-50 border-t border-rose-200 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-rose-800">
+                        <i class="fa-solid fa-key mr-1"></i> 刪除「<span id="targetDeleteEmployeeName"></span>」請輸入管理密碼：
+                    </span>
+                    <button type="button" onclick="cancelDeleteEmployee()" class="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer">取消</button>
+                </div>
+                <form onsubmit="submitDeleteEmployeeForm(event)" class="flex items-center gap-2">
+                    <input type="password" id="deleteEmployeePasswordInput" placeholder="請輸入管理密碼" class="flex-grow rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 focus:outline-none">
+                    <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition whitespace-nowrap cursor-pointer">
+                        驗證並刪除
+                    </button>
+                </form>
+            </div>
+
+            <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button type="button" onclick="closeManageEmployeesModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition cursor-pointer">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 浮動通知 Toast (取代 alert())              -->
+    <!-- ========================================== -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- ========================================== -->
+    <!-- JavaScript 核心邏輯                        -->
+    <!-- ========================================== -->
+    <script>
+        // 儲存鍵值定義
+        const STORAGE_KEY_ATTENDANCE = 'smart_attendance_records_v2';
+        const STORAGE_KEY_LEAVES = 'smart_leave_records_v2';
+        const STORAGE_KEY_EMPLOYEES = 'smart_attendance_employees_v2';
+        const STORAGE_KEY_ACTIVE_EMP = 'smart_attendance_active_emp_v2';
+        const ADMIN_DELETE_PASSWORD = '1688';
+        const DEFAULT_EMPLOYEES = ['王小明', '陳美玲', '林志豪'];
+
+        // 應用程式狀態
+        let employees = [];            // 人員名單陣列
+        let activeEmployee = '';       // 目前選中的操作人員
+        let attendanceRecords = [];    // 打卡紀錄陣列
+        let leaveRecords = [];         // 請假紀錄陣列
+        let currentTypeFilter = 'all'; // 'all' | 'attendance' | 'leave'
+        let pendingDeleteEmployee = null;
+
+        // 假別顏色與標籤樣式對應表
+        const LEAVE_BADGE_STYLES = {
+            '事假': 'bg-amber-100 text-amber-800 border-amber-200',
+            '病假': 'bg-rose-100 text-rose-800 border-rose-200',
+            '特休': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            '公假': 'bg-sky-100 text-sky-800 border-sky-200',
+            '婚假': 'bg-pink-100 text-pink-800 border-pink-200',
+            '喪假': 'bg-slate-200 text-slate-800 border-slate-300',
+            '產假/陪產假': 'bg-purple-100 text-purple-800 border-purple-200',
+            '生理假': 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+            '補休': 'bg-teal-100 text-teal-800 border-teal-200',
+            '其他假別': 'bg-indigo-100 text-indigo-800 border-indigo-200'
+        };
+
+        // 初始化應用程式
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFromStorage();
+            initMonthFilter();
+            renderEmployeeDropdowns();
+            startLiveClock();
+            refreshUI();
+        });
+
+        // 統一刷新全畫面狀態
+        function refreshUI() {
+            updateTodayStatusCard();
+            updateStatistics();
+            renderRecords();
+        }
+
+        // 1. 讀取與儲存 localStorage
+        function loadFromStorage() {
+            try {
+                const savedEmps = localStorage.getItem(STORAGE_KEY_EMPLOYEES);
+                employees = savedEmps ? JSON.parse(savedEmps) : [...DEFAULT_EMPLOYEES];
+                if (!Array.isArray(employees) || employees.length === 0) {
+                    employees = [...DEFAULT_EMPLOYEES];
+                }
+
+                const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE_EMP);
+                activeEmployee = (savedActive && employees.includes(savedActive)) ? savedActive : employees[0];
+
+                const savedAtt = localStorage.getItem(STORAGE_KEY_ATTENDANCE);
+                const savedLeaves = localStorage.getItem(STORAGE_KEY_LEAVES);
+                attendanceRecords = savedAtt ? JSON.parse(savedAtt) : [];
+                leaveRecords = savedLeaves ? JSON.parse(savedLeaves) : [];
+            } catch (e) {
+                console.error('讀取本機資料失敗:', e);
+                employees = [...DEFAULT_EMPLOYEES];
+                activeEmployee = employees[0];
+                attendanceRecords = [];
+                leaveRecords = [];
+            }
+        }
+
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY_EMPLOYEES, JSON.stringify(employees));
+                localStorage.setItem(STORAGE_KEY_ACTIVE_EMP, activeEmployee);
+                localStorage.setItem(STORAGE_KEY_ATTENDANCE, JSON.stringify(attendanceRecords));
+                localStorage.setItem(STORAGE_KEY_LEAVES, JSON.stringify(leaveRecords));
+            } catch (e) {
+                showToast('儲存資料失敗，請檢查瀏覽器空間', 'error');
+            }
+        }
+
+        // 渲染人員下拉選單（上方操作人員 + 頂部徽章 + 下方篩選選單）
+        function renderEmployeeDropdowns() {
+            const activeSelect = document.getElementById('activeEmployeeSelect');
+            activeSelect.innerHTML = employees.map(emp => 
+                `<option value="${escapeHtml(emp)}" ${emp === activeEmployee ? 'selected' : ''}>${escapeHtml(emp)}</option>`
+            ).join('');
+
+            document.getElementById('clockPanelEmployeeName').textContent = activeEmployee;
+            document.getElementById('headerActiveUserName').textContent = activeEmployee;
+
+            // 同步更新列表篩選選單
+            const filterSelect = document.getElementById('employeeRecordFilter');
+            const prevFilterVal = filterSelect.value || 'all';
+            
+            const allKnownEmployees = new Set(employees);
+            attendanceRecords.forEach(r => { if (r.employee) allKnownEmployees.add(r.employee); });
+            leaveRecords.forEach(r => { if (r.employee) allKnownEmployees.add(r.employee); });
+
+            let optionsHtml = `<option value="all">全部人員</option>`;
+            allKnownEmployees.forEach(emp => {
+                optionsHtml += `<option value="${escapeHtml(emp)}">${escapeHtml(emp)}</option>`;
+            });
+            filterSelect.innerHTML = optionsHtml;
+
+            if (prevFilterVal === 'all' || allKnownEmployees.has(prevFilterVal)) {
+                filterSelect.value = prevFilterVal;
+            } else {
+                filterSelect.value = 'all';
+            }
+        }
+
+        // 切換目前操作人員
+        function handleEmployeeChange() {
+            const select = document.getElementById('activeEmployeeSelect');
+            activeEmployee = select.value;
+            document.getElementById('clockPanelEmployeeName').textContent = activeEmployee;
+            document.getElementById('headerActiveUserName').textContent = activeEmployee;
+            saveToStorage();
+            updateTodayStatusCard();
+            showToast(`已切換操作人員為「${activeEmployee}」`, 'info');
+        }
+
+        // 展開 / 收合頁面內快速新增人員輸入列
+        function toggleInlineAddEmployee(show) {
+            const bar = document.getElementById('inlineAddEmployeeBar');
+            const input = document.getElementById('newEmployeeNameInput');
+            if (show) {
+                bar.classList.remove('hidden');
+                input.value = '';
+                setTimeout(() => input.focus(), 50);
+            } else {
+                bar.classList.add('hidden');
+                input.value = '';
+            }
+        }
+
+        // 提交新增人員表單 (免密碼)
+        function submitAddEmployee(event) {
+            event.preventDefault();
+            const input = document.getElementById('newEmployeeNameInput');
+            const name = input.value.trim();
+
+            if (!name) {
+                showToast('人員姓名不可為空白！', 'error');
+                input.focus();
+                return;
+            }
+            if (employees.includes(name)) {
+                showToast(`「${name}」已經在人員名單中囉！`, 'warning');
+                input.focus();
+                return;
+            }
+
+            employees.push(name);
+            activeEmployee = name;
+            saveToStorage();
+            renderEmployeeDropdowns();
+            refreshUI();
+            toggleInlineAddEmployee(false);
+            showToast(`已新增並切換至人員「${name}」`, 'success');
+        }
+
+        // 人員管理與刪除驗證 Modal 控制
+        function openManageEmployeesModal() {
+            cancelDeleteEmployee();
+            renderEmployeeManageList();
+            const modal = document.getElementById('manageEmployeesModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeManageEmployeesModal() {
+            cancelDeleteEmployee();
+            const modal = document.getElementById('manageEmployeesModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function renderEmployeeManageList() {
+            const listEl = document.getElementById('employeeManageList');
+            listEl.innerHTML = employees.map(emp => {
+                const isCurrent = emp === activeEmployee;
+                return `
+                    <div class="flex items-center justify-between px-4 py-3 bg-white hover:bg-slate-50 transition">
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                                ${escapeHtml(emp.charAt(0))}
+                            </div>
+                            <span class="text-sm font-bold text-slate-800">${escapeHtml(emp)}</span>
+                            ${isCurrent ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">目前使用中</span>' : ''}
+                        </div>
+                        <button type="button" onclick="promptDeleteEmployee('${escapeHtml(emp).replace(/'/g, "\\'")}')" class="text-slate-400 hover:text-rose-600 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition text-xs font-semibold flex items-center space-x-1 cursor-pointer">
+                            <i class="fa-regular fa-trash-can"></i>
+                            <span>刪除</span>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function promptDeleteEmployee(empName) {
+            if (employees.length <= 1) {
+                showToast('系統至少需保留一位人員，無法刪除最後一位！', 'warning');
+                return;
+            }
+            pendingDeleteEmployee = empName;
+            document.getElementById('targetDeleteEmployeeName').textContent = empName;
+            const pwdInput = document.getElementById('deleteEmployeePasswordInput');
+            pwdInput.value = '';
+            document.getElementById('deletePasswordSection').classList.remove('hidden');
+            setTimeout(() => pwdInput.focus(), 50);
+        }
+
+        function cancelDeleteEmployee() {
+            pendingDeleteEmployee = null;
+            document.getElementById('deletePasswordSection').classList.add('hidden');
+            document.getElementById('deleteEmployeePasswordInput').value = '';
+        }
+
+        function submitDeleteEmployeeForm(event) {
+            event.preventDefault();
+            confirmDeleteEmployeeWithPassword();
+        }
+
+        function confirmDeleteEmployeeWithPassword() {
+            const pwdInput = document.getElementById('deleteEmployeePasswordInput');
+            const pwd = pwdInput.value.trim();
+
+            if (pwd !== ADMIN_DELETE_PASSWORD) {
+                showToast('管理密碼錯誤，無法刪除！', 'error');
+                pwdInput.value = '';
+                pwdInput.focus();
+                return;
+            }
+
+            if (!pendingDeleteEmployee) return;
+
+            const deletedName = pendingDeleteEmployee;
+            employees = employees.filter(e => e !== deletedName);
+
+            if (activeEmployee === deletedName) {
+                activeEmployee = employees[0];
+            }
+
+            saveToStorage();
+            cancelDeleteEmployee();
+            renderEmployeeManageList();
+            renderEmployeeDropdowns();
+            refreshUI();
+            showToast(`已成功刪除人員「${deletedName}」`, 'success');
+        }
+
+        // 2. 初始化月份篩選器為當月
+        function initMonthFilter() {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const monthInput = document.getElementById('monthFilter');
+            monthInput.value = `${yyyy}-${mm}`;
+            monthInput.addEventListener('change', refreshUI);
+        }
+
+        // 取得目前格式化的本地日期字串 YYYY-MM-DD
+        function getTodayDateString() {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // 取得目前格式化的本地時間字串 HH:MM:SS
+        function getCurrentTimeString() {
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            return `${hh}:${min}:${ss}`;
+        }
+
+        // 3. 即時時鐘運作
+        function startLiveClock() {
+            const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            
+            function updateClock() {
+                const now = new Date();
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                const dayName = weekdays[now.getDay()];
+
+                document.getElementById('liveDate').textContent = `${yyyy} 年 ${mm} 月 ${dd} 日 (${dayName})`;
+                document.getElementById('liveTime').textContent = getCurrentTimeString();
+            }
+
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        // 4. 上下班打卡處理邏輯 (綁定目前操作人員)
+        function handleClock(type) {
+            if (!activeEmployee) {
+                showToast('請先選擇操作人員！', 'error');
+                return;
+            }
+
+            const today = getTodayDateString();
+            const nowTime = getCurrentTimeString();
+            const customNote = document.getElementById('todayNoteInput').value.trim();
+            let todayRecord = attendanceRecords.find(r => r.date === today && r.employee === activeEmployee);
+
+            if (type === 'in') {
+                if (todayRecord && todayRecord.clockIn) {
+                    showToast(`${activeEmployee} 今日已於 ${todayRecord.clockIn} 打過上班卡囉！`, 'warning');
+                    return;
+                }
+                if (!todayRecord) {
+                    todayRecord = {
+                        id: 'att_' + Date.now(),
+                        employee: activeEmployee,
+                        date: today,
+                        clockIn: nowTime,
+                        clockOut: null,
+                        workHours: 0,
+                        note: customNote || '正常出勤'
+                    };
+                    attendanceRecords.push(todayRecord);
+                } else {
+                    todayRecord.clockIn = nowTime;
+                    if (customNote) todayRecord.note = customNote;
+                }
+                saveToStorage();
+                renderEmployeeDropdowns();
+                refreshUI();
+                showToast(`${activeEmployee} 上班打卡成功！時間：${nowTime}`, 'success');
+
+            } else if (type === 'out') {
+                if (!todayRecord || !todayRecord.clockIn) {
+                    showToast(`請先為「${activeEmployee}」進行上班打卡，再打下班卡！`, 'error');
+                    return;
+                }
+                todayRecord.clockOut = nowTime;
+                todayRecord.workHours = calculateWorkDuration(todayRecord.clockIn, nowTime);
+                if (customNote) todayRecord.note = customNote;
+                
+                saveToStorage();
+                refreshUI();
+                showToast(`${activeEmployee} 下班打卡成功！今日工時：${todayRecord.workHours} 小時`, 'success');
+            }
+        }
+
+        // 更新今日出勤備註
+        function updateTodayNote() {
+            const today = getTodayDateString();
+            const todayRecord = attendanceRecords.find(r => r.date === today && r.employee === activeEmployee);
+            const customNote = document.getElementById('todayNoteInput').value.trim();
+            if (todayRecord) {
+                todayRecord.note = customNote || '正常出勤';
+                saveToStorage();
+                renderRecords();
+                showToast(`已更新「${activeEmployee}」今日出勤備註`, 'info');
+            }
+        }
+
+        // 計算工時 (扣除午休1小時邏輯：若總時長超過 5 小時，自動扣除 1 小時午休)
+        function calculateWorkDuration(startTimeStr, endTimeStr) {
+            const [sh, sm, ss] = startTimeStr.split(':').map(Number);
+            const [eh, em, es] = endTimeStr.split(':').map(Number);
+            
+            const startSeconds = sh * 3600 + sm * 60 + (ss || 0);
+            const endSeconds = eh * 3600 + em * 60 + (es || 0);
+            
+            let diffHours = (endSeconds - startSeconds) / 3600;
+            if (diffHours < 0) diffHours = 0;
+
+            if (diffHours > 5) {
+                diffHours -= 1;
+            }
+            return Math.max(0, Number(diffHours.toFixed(2)));
+        }
+
+        // 更新今日打卡卡片狀態 (依目前操作人員顯示)
+        function updateTodayStatusCard() {
+            const today = getTodayDateString();
+            const todayRecord = attendanceRecords.find(r => r.date === today && r.employee === activeEmployee);
+            
+            const elIn = document.getElementById('todayClockIn');
+            const elOut = document.getElementById('todayClockOut');
+            const badge = document.getElementById('currentStatusBadge');
+            const noteInput = document.getElementById('todayNoteInput');
+
+            if (!todayRecord) {
+                elIn.textContent = '--:--:--';
+                elOut.textContent = '--:--:--';
+                noteInput.value = '';
+                badge.textContent = `${activeEmployee} · 今日尚未打卡`;
+                badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600';
+            } else {
+                elIn.textContent = todayRecord.clockIn || '--:--:--';
+                elOut.textContent = todayRecord.clockOut || '--:--:--';
+                noteInput.value = (todayRecord.note && todayRecord.note !== '正常出勤') ? todayRecord.note : '';
+                
+                if (todayRecord.clockIn && !todayRecord.clockOut) {
+                    badge.textContent = `${activeEmployee} · 工作中`;
+                    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700';
+                } else if (todayRecord.clockIn && todayRecord.clockOut) {
+                    badge.textContent = `${activeEmployee} · 已下班 (${todayRecord.workHours} hr)`;
+                    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700';
+                }
+            }
+        }
+
+        // 5. 請假表單 Modal 控制與邏輯
+        function openLeaveModal() {
+            document.getElementById('leaveModalEmployeeName').textContent = activeEmployee;
+            document.getElementById('leaveDate').value = getTodayDateString();
+            document.getElementById('leavePreset').value = 'full';
+            applyLeavePreset();
+            const reasonInput = document.getElementById('leaveReason');
+            reasonInput.value = '';
+            
+            const modal = document.getElementById('leaveModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => reasonInput.focus(), 50);
+        }
+
+        function closeLeaveModal() {
+            const modal = document.getElementById('leaveModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function applyLeavePreset() {
+            const preset = document.getElementById('leavePreset').value;
+            const startInput = document.getElementById('leaveStartTime');
+            const endInput = document.getElementById('leaveEndTime');
+            const hoursInput = document.getElementById('leaveHours');
+
+            if (preset === 'full') {
+                startInput.value = '09:00';
+                endInput.value = '18:00';
+                hoursInput.value = 8;
+            } else if (preset === 'am') {
+                startInput.value = '09:00';
+                endInput.value = '13:00';
+                hoursInput.value = 4;
+            } else if (preset === 'pm') {
+                startInput.value = '14:00';
+                endInput.value = '18:00';
+                hoursInput.value = 4;
+            }
+        }
+
+        function calculateLeaveHours() {
+            document.getElementById('leavePreset').value = 'custom';
+            const start = document.getElementById('leaveStartTime').value;
+            const end = document.getElementById('leaveEndTime').value;
+            if (!start || !end) return;
+
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            let diff = ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+            
+            if (diff > 5) diff -= 1;
+            if (diff > 0) {
+                document.getElementById('leaveHours').value = Number(diff.toFixed(1));
+            }
+        }
+
+        function submitLeaveForm(event) {
+            event.preventDefault();
+            const type = document.getElementById('leaveType').value;
+            const date = document.getElementById('leaveDate').value;
+            const startTime = document.getElementById('leaveStartTime').value;
+            const endTime = document.getElementById('leaveEndTime').value;
+            const hours = parseFloat(document.getElementById('leaveHours').value);
+            const reason = document.getElementById('leaveReason').value.trim();
+
+            if (hours <= 0 || isNaN(hours)) {
+                showToast('請輸入有效的請假時數！', 'error');
+                return;
+            }
+
+            const newLeave = {
+                id: 'lv_' + Date.now(),
+                employee: activeEmployee,
+                date,
+                type,
+                startTime,
+                endTime,
+                hours,
+                reason
+            };
+
+            leaveRecords.push(newLeave);
+            saveToStorage();
+            renderEmployeeDropdowns();
+            
+            document.getElementById('monthFilter').value = date.substring(0, 7);
+            
+            closeLeaveModal();
+            refreshUI();
+            showToast(`已為「${activeEmployee}」送出${type}申請 (${hours} 小時)`, 'success');
+        }
+
+        // 當下方人員篩選改變時，同步刷新統計摘要與明細表
+        function onRecordEmployeeFilterChange() {
+            updateStatistics();
+            renderRecords();
+        }
+
+        // 6. 統計摘要計算與渲染 (隨人員篩選即時連動)
+        function updateStatistics() {
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const selectedEmpFilter = document.getElementById('employeeRecordFilter').value;
+
+            document.getElementById('statMonthLabel').textContent = `統計月份：${selectedMonth.replace('-', ' 年 ')} 月`;
+            document.getElementById('statEmployeeBadge').textContent = selectedEmpFilter === 'all' ? '全部人員' : selectedEmpFilter;
+
+            const monthAtt = attendanceRecords.filter(r => 
+                r.date.startsWith(selectedMonth) && (selectedEmpFilter === 'all' || r.employee === selectedEmpFilter)
+            );
+            const monthLeaves = leaveRecords.filter(r => 
+                r.date.startsWith(selectedMonth) && (selectedEmpFilter === 'all' || r.employee === selectedEmpFilter)
+            );
+
+            const workDays = monthAtt.filter(r => r.clockIn).length;
+            const totalWorkHours = monthAtt.reduce((sum, r) => sum + (Number(r.workHours) || 0), 0);
+
+            const totalLeaveHours = monthLeaves.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
+            const totalLeaveDays = Number((totalLeaveHours / 8).toFixed(1));
+
+            document.getElementById('statWorkDays').textContent = workDays;
+            document.getElementById('statTotalHours').textContent = totalWorkHours.toFixed(1);
+            document.getElementById('statLeaveHours').textContent = totalLeaveHours;
+            document.getElementById('statLeaveDays').textContent = totalLeaveDays;
+
+            const categories = ['事假', '病假', '特休', '公假', '婚假', '喪假', '補休', '其他'];
+            const breakdownMap = {};
+            categories.forEach(c => breakdownMap[c] = 0);
+
+            monthLeaves.forEach(lv => {
+                if (Object.prototype.hasOwnProperty.call(breakdownMap, lv.type)) {
+                    breakdownMap[lv.type] += Number(lv.hours);
+                } else {
+                    breakdownMap['其他'] += Number(lv.hours);
+                }
+            });
+
+            const gridEl = document.getElementById('leaveBreakdownGrid');
+            gridEl.innerHTML = categories.map(cat => {
+                const hrs = breakdownMap[cat];
+                const hasHours = hrs > 0;
+                return `
+                    <div class="flex items-center justify-between px-3 py-2 rounded-xl border ${hasHours ? 'bg-slate-50 border-slate-300' : 'bg-slate-50/40 border-slate-100'}">
+                        <span class="text-xs font-medium ${hasHours ? 'text-slate-800 font-semibold' : 'text-slate-400'}">${cat}</span>
+                        <span class="text-xs font-mono ${hasHours ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${hrs} hr</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 7. 紀錄列表篩選與渲染
+        function setTypeFilter(type) {
+            currentTypeFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                btn.classList.add('text-slate-600');
+            });
+            const activeBtn = document.getElementById(`filter-${type}`);
+            activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+            activeBtn.classList.remove('text-slate-600');
+
+            renderRecords();
+        }
+
+        function getWeekdayLabel(dateStr) {
+            const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+            const d = new Date(dateStr + 'T00:00:00');
+            return days[d.getDay()] || '';
+        }
+
+        function renderRecords() {
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const selectedEmpFilter = document.getElementById('employeeRecordFilter').value;
+            const leaveTypeFilter = document.getElementById('leaveTypeFilter').value;
+            const tbody = document.getElementById('recordsTableBody');
+            const emptyState = document.getElementById('emptyState');
+
+            let combined = [];
+
+            if (currentTypeFilter === 'all' || currentTypeFilter === 'attendance') {
+                attendanceRecords
+                    .filter(r => r.date.startsWith(selectedMonth))
+                    .filter(r => selectedEmpFilter === 'all' || r.employee === selectedEmpFilter)
+                    .forEach(r => {
+                        combined.push({
+                            category: 'attendance',
+                            id: r.id,
+                            employee: r.employee || '未指定',
+                            date: r.date,
+                            badgeText: '上下班打卡',
+                            badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+                            timeRange: `${r.clockIn || '--:--'} ~ ${r.clockOut || '尚未下班'}`,
+                            hoursText: r.clockOut ? `${r.workHours} 小時` : '計算中',
+                            note: r.note || '正常出勤'
+                        });
+                    });
+            }
+
+            if (currentTypeFilter === 'all' || currentTypeFilter === 'leave') {
+                leaveRecords
+                    .filter(r => r.date.startsWith(selectedMonth))
+                    .filter(r => selectedEmpFilter === 'all' || r.employee === selectedEmpFilter)
+                    .filter(r => leaveTypeFilter === 'all' || r.type === leaveTypeFilter)
+                    .forEach(r => {
+                        combined.push({
+                            category: 'leave',
+                            id: r.id,
+                            employee: r.employee || '未指定',
+                            date: r.date,
+                            badgeText: r.type,
+                            badgeClass: LEAVE_BADGE_STYLES[r.type] || 'bg-slate-100 text-slate-800 border-slate-200',
+                            timeRange: `${r.startTime} ~ ${r.endTime}`,
+                            hoursText: `${r.hours} 小時`,
+                            note: r.reason
+                        });
+                    });
+            }
+
+            combined.sort((a, b) => b.date.localeCompare(a.date));
+
+            if (combined.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            tbody.innerHTML = combined.map(item => `
+                <tr class="hover:bg-slate-50/90 transition group">
+                    <td class="py-3.5 px-5 whitespace-nowrap">
+                        <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-bold text-xs">
+                            <i class="fa-solid fa-user text-slate-400 text-[10px]"></i>
+                            <span>${escapeHtml(item.employee)}</span>
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <div class="font-semibold text-slate-800 font-mono">${item.date}</div>
+                        <div class="text-xs text-slate-400">${getWeekdayLabel(item.date)}</div>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${item.badgeClass}">
+                            ${item.category === 'attendance' ? '<i class="fa-solid fa-clock mr-1.5 text-[10px]"></i>' : '<i class="fa-solid fa-calendar-minus mr-1.5 text-[10px]"></i>'}
+                            ${item.badgeText}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap font-mono text-slate-700 text-xs sm:text-sm">
+                        ${item.timeRange}
+                    </td>
+                    <td class="py-3.5 px-4 whitespace-nowrap font-semibold text-slate-800">
+                        ${item.hoursText}
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600 max-w-xs truncate" title="${escapeHtml(item.note)}">
+                        ${escapeHtml(item.note)}
+                    </td>
+                    <td class="py-3.5 px-5 whitespace-nowrap text-right">
+                        <button type="button" onclick="confirmDeleteRecord('${item.category}', '${item.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer" title="刪除此筆紀錄">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 8. 刪除紀錄與自訂確認框
+        function confirmDeleteRecord(category, id) {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmTitle').textContent = '確認刪除此筆紀錄？';
+            document.getElementById('confirmMessage').textContent = '刪除後將無法復原此筆差勤或請假資料，確定要繼續嗎？';
+            
+            const actionBtn = document.getElementById('confirmActionBtn');
+            actionBtn.onclick = () => {
+                if (category === 'attendance') {
+                    attendanceRecords = attendanceRecords.filter(r => r.id !== id);
+                } else {
+                    leaveRecords = leaveRecords.filter(r => r.id !== id);
+                }
+                saveToStorage();
+                refreshUI();
+                closeConfirmModal();
+                showToast('已成功刪除紀錄', 'info');
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function openConfirmClearModal() {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmTitle').textContent = '清除所有本機資料？';
+            document.getElementById('confirmMessage').textContent = '這將會清空所有的打卡與請假歷史紀錄且無法復原！建議先匯出 CSV 備份。';
+            
+            const actionBtn = document.getElementById('confirmActionBtn');
+            actionBtn.onclick = () => {
+                attendanceRecords = [];
+                leaveRecords = [];
+                saveToStorage();
+                refreshUI();
+                closeConfirmModal();
+                showToast('已清空所有差勤與請假資料', 'info');
+            };
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // 9. 匯出 CSV 報表 (第一欄為人員姓名，含 UTF-8 BOM 確保 Excel 開啟不亂碼)
+        function exportToCSV() {
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const selectedEmpFilter = document.getElementById('employeeRecordFilter').value;
+
+            const monthAtt = attendanceRecords.filter(r => 
+                r.date.startsWith(selectedMonth) && (selectedEmpFilter === 'all' || r.employee === selectedEmpFilter)
+            );
+            const monthLeaves = leaveRecords.filter(r => 
+                r.date.startsWith(selectedMonth) && (selectedEmpFilter === 'all' || r.employee === selectedEmpFilter)
+            );
+
+            if (monthAtt.length === 0 && monthLeaves.length === 0) {
+                showToast(`${selectedMonth} 尚無任何紀錄可匯出！`, 'warning');
+                return;
+            }
+
+            let csvRows = [
+                ['人員姓名', '日期', '星期', '紀錄類型', '假別/狀態', '上班/開始時間', '下班/結束時間', '時數(小時)', '備註']
+            ];
+
+            monthAtt.forEach(r => {
+                csvRows.push([
+                    `"${(r.employee || '未指定').replace(/"/g, '""')}"`,
+                    r.date,
+                    getWeekdayLabel(r.date),
+                    '出勤打卡',
+                    '正常出勤',
+                    r.clockIn || '',
+                    r.clockOut || '',
+                    r.workHours || 0,
+                    `"${(r.note || '').replace(/"/g, '""')}"`
+                ]);
+            });
+
+            monthLeaves.forEach(r => {
+                csvRows.push([
+                    `"${(r.employee || '未指定').replace(/"/g, '""')}"`,
+                    r.date,
+                    getWeekdayLabel(r.date),
+                    '請假申請',
+                    r.type,
+                    r.startTime,
+                    r.endTime,
+                    r.hours,
+                    `"${(r.reason || '').replace(/"/g, '""')}"`
+                ]);
+            });
+
+            const header = csvRows[0];
+            const body = csvRows.slice(1).sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+            const csvContent = '\uFEFF' + [header, ...body].map(e => e.join(',')).join('\n');
+
+            const fileSuffix = selectedEmpFilter === 'all' ? '全體人員' : selectedEmpFilter;
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `差勤與請假報表_${selectedMonth}_${fileSuffix}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showToast(`已成功下載「差勤與請假報表_${selectedMonth}_${fileSuffix}.csv」`, 'success');
+        }
+
+        // 10. 載入範例測試資料 (含多位人員測試紀錄)
+        function seedDemoData() {
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const emp1 = employees[0] || '王小明';
+            const emp2 = employees[1] || '陳美玲';
+            const emp3 = employees[2] || '林志豪';
+
+            const demoAtt = [
+                { id: 'demo_a1_' + Date.now(), employee: emp1, date: `${selectedMonth}-02`, clockIn: '08:55:12', clockOut: '18:05:30', workHours: 8.17, note: '正常出勤' },
+                { id: 'demo_a2_' + Date.now(), employee: emp2, date: `${selectedMonth}-02`, clockIn: '09:00:05', clockOut: '18:10:00', workHours: 8.17, note: '正常出勤' },
+                { id: 'demo_a3_' + Date.now(), employee: emp3, date: `${selectedMonth}-03`, clockIn: '08:50:44', clockOut: '18:00:10', workHours: 8.16, note: '外勤拜訪客戶' },
+            ];
+            const demoLeaves = [
+                { id: 'demo_l1_' + Date.now(), employee: emp1, date: `${selectedMonth}-05`, type: '事假', startTime: '14:00', endTime: '18:00', hours: 4, reason: '下午前往銀行辦理個人房屋貸款手續' },
+                { id: 'demo_l2_' + Date.now(), employee: emp2, date: `${selectedMonth}-10`, type: '特休', startTime: '09:00', endTime: '18:00', hours: 8, reason: '安排家庭旅遊休假一日' },
+                { id: 'demo_l3_' + Date.now(), employee: emp3, date: `${selectedMonth}-12`, type: '病假', startTime: '09:00', endTime: '13:00', hours: 4, reason: '重感冒前往診所就醫與休息' }
+            ];
+
+            attendanceRecords = [...attendanceRecords, ...demoAtt];
+            leaveRecords = [...leaveRecords, ...demoLeaves];
+            saveToStorage();
+            renderEmployeeDropdowns();
+            refreshUI();
+            showToast('已載入本月多位人員範例出勤與請假資料！', 'success');
+        }
+
+        // 工具函式：Toast 通知與 XSS 防護
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const styles = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-rose-600 text-white',
+                warning: 'bg-amber-500 text-white',
+                info: 'bg-slate-800 text-white'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-xmark',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `${styles[type]} px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2.5 text-sm font-medium transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]}"></i><span>${escapeHtml(message)}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
